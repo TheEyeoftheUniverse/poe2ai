@@ -12,7 +12,7 @@ from astrbot.api.star import Context, Star, register
 
 from .core.db import SnapshotDB, format_item
 from .core.fetcher import Fetcher
-from .core.render import render_item_card, render_mods_card, render_wiki_card
+from .core.render import render_item_card, render_mods_card, render_wiki_card, render_find_card
 
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 BUNDLED_DB = os.path.join(PLUGIN_DIR, "data", "poe2db.sqlite3")
@@ -61,9 +61,33 @@ class Poe2Ai(Star):
 
     # ---------- LLM 工具(自然语言主路径) ----------
 
+    @filter.llm_tool(name="poe2_find_items_by_effect")
+    async def find_items_by_effect(self, event: AstrMessageEvent, effect: str, kind: str = "unique"):
+        '''按效果反查 Path of Exile 2 的装备(默认查暗金/传奇)。当用户描述想要的效果但不知道装备名称时调用,例如"加很多血量的传奇是什么""哪个暗金加攻速"。effect 必须传从用户话里提炼的精炼效果关键词(2~8字,如"生命上限"、"攻击速度提高"、"闪电抗性"),绝不传用户原话整句。常见口语会自动归一:血量→生命上限、攻速→攻击速度、火抗→火焰抗性。
+
+        Args:
+            effect(string): 精炼效果关键词,如"生命上限"
+            kind(string): 可选,装备类别:unique=暗金(默认),base=普通基底,留空=全部
+        '''
+        items = self.db.find_items_by_effect(effect, kind=kind, limit=8)
+        if not items:
+            yield event.plain_result(
+                "没有找到固定效果含「" + effect + "」的" + ("暗金装备" if kind == "unique" else "装备")
+                + "。可换更短的关键词(如「生命上限」「抗性」)。")
+            return
+        if self.config.get("render_image", True):
+            url = await render_find_card(self, effect, items, kind)
+            if url:
+                yield event.image_result(url)
+        lines = []
+        for it in items[:8]:
+            ml = "; ".join(it["matched_lines"][:2])
+            lines.append("【" + it["name_cn"] + "】(" + (it["base_type"] or "") + ") " + ml)
+        yield event.plain_result("\n".join(lines))
+
     @filter.llm_tool(name="poe2_query_item")
     async def query_item(self, event: AstrMessageEvent, query: str):
-        '''查询 Path of Exile 2 的装备、物品或暗金(unique)装备,返回其属性、需求与固定效果,并附带装备图片。当用户询问"某装备是什么/什么效果/属性"时调用。传入装备的标准中文名(如"猎首")或英文名(如"Headhunter")。
+        '''按名称查询 Path of Exile 2 的装备、物品或暗金(unique)装备,返回其属性、需求与固定效果,并附带装备图片。仅在已知装备名称时调用(如"猎首是什么效果""Headhunter 属性")。用户只描述效果而不知道名称时,应改用 poe2_find_items_by_effect。传入装备的标准中文名(如"猎首")或英文名(如"Headhunter"),不要传描述性语句。
 
         Args:
             query(string): 装备/物品的中文名或英文名
@@ -101,10 +125,10 @@ class Poe2Ai(Star):
 
     @filter.llm_tool(name="poe2_query_mod")
     async def query_mod(self, event: AstrMessageEvent, query: str, item_class: str = ""):
-        '''查询 Path of Exile 2 的词条(词缀/mod),返回其各阶级(tier)的数值区间、出现部位与需求等级。当用户询问"某词条/t1攻速/最大生命值是多少"时调用。传入词条的效果描述(如"攻击速度提高"、"最大生命"),可选物品部位。
+        '''查询 Path of Exile 2 的词条(词缀/mod)各阶级数值区间、出现部位与需求等级。当用户问词条/tier 数值时调用(如"t1攻速是多少""生命上限词条上限")。query 必须传官方效果关键词(2~8字,如"生命上限"、"攻击速度提高"),不传用户原话整句;口语自动归一(血量→生命上限、攻速→攻击速度)。想按效果找具体装备时改用 poe2_find_items_by_effect。
 
         Args:
-            query(string): 词条的效果文本或名称,如"攻击速度提高"
+            query(string): 官方效果关键词,如"攻击速度提高"
             item_class(string): 可选,物品部位限定,如"单手剑"、"项链"
         '''
         limit = int(self.config.get("max_mods", 20))
@@ -132,10 +156,10 @@ class Poe2Ai(Star):
 
     @filter.llm_tool(name="poe2_search_wiki")
     async def search_wiki(self, event: AstrMessageEvent, query: str):
-        '''在 poe2db.tw 全站本地快照(技能宝石、怪物、地图、任务、机制说明等全部内容)中搜索。当问题不属于装备/词条(如技能、天赋、Boss、机制解释)时调用。
+        '''在 poe2db.tw 全站本地快照中搜索非装备类内容:技能宝石、怪物、Boss、地图/路石、任务、升华、机制说明等。仅在问题不涉及装备/词条/效果找装备时调用(那些用 poe2_query_item / poe2_query_mod / poe2_find_items_by_effect)。query 必须传 2~6 字精炼关键词(如"升华"、"电球"、"断金"),绝不传用户原话整句——本工具是精确子串匹配,长句必然搜不到。
 
         Args:
-            query(string): 搜索关键词
+            query(string): 2~6 字精炼关键词
         '''
         pages = self.db.search_wiki(query, limit=3)
         if not pages:

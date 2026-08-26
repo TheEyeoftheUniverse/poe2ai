@@ -168,3 +168,46 @@ async def render_wiki_card(plugin, query, pages) -> "str | None":
             options={"full_page": True, "type": "png"})
     except Exception:
         return None
+
+
+FIND_TMPL = """
+<div class="wrap">
+  <div class="card">
+    <div class="title">效果匹配:{{ effect }}</div>
+    <div class="sub">按固定效果反查{{ '暗金装备' if kind == 'unique' else '装备基底' }}</div>
+    {% for it in items %}
+      <div class="sep"></div>
+      <div class="pt">{{ it.name_cn }} <span class="bt">({{ it.base_type }})</span></div>
+      {% for l in it.matched_lines %}
+        <div class="ml">{{ l }}</div>
+      {% endfor %}
+    {% endfor %}
+    <div class="sep"></div>
+    <div class="foot">数据 poe2db.tw · 快照 {{ version }}</div>
+  </div>
+</div>
+<style>
+  html, body { margin: 0; padding: 0; background: #121218; }
+  .wrap { width: 100%; box-sizing: border-box; padding: 14px;
+          font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
+  .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
+          border-radius: 14px; padding: 24px 28px 16px; }
+  .title { font-size: 30px; font-weight: 700; color: #d0b86a; }
+  .sub { font-size: 18px; color: #7f7f7f; margin-top: 4px; }
+  .sep { height: 2px; background: #33333c; margin: 14px 0; }
+  .pt { color: #af6025; font-size: 24px; font-weight: 600; }
+  .bt { color: #7f7f7f; font-size: 17px; font-weight: 400; }
+  .ml { color: #8888ff; font-size: 19px; line-height: 1.7; }
+  .foot { color: #55555e; font-size: 15px; margin-top: 10px; }
+</style>
+"""
+
+
+async def render_find_card(plugin, effect, items, kind="unique") -> "str | None":
+    try:
+        return await plugin.html_render(
+            FIND_TMPL, {"effect": effect, "items": items, "kind": kind,
+                        "version": plugin.db.stats()["version"]},
+            options={"full_page": True, "type": "png"})
+    except Exception:
+        return None

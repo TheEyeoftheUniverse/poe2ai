@@ -7,6 +7,26 @@ import sqlite3
 import threading
 
 
+# 常见口语 → 官方术语(查询前展开,提升模糊命中率)
+SYNONYMS = {
+    "血量": ["生命上限"], "生命值": ["生命上限"], "血条": ["生命上限"],
+    "回血": ["生命回复"], "回蓝": ["魔力回复"], "蓝量": ["魔力"],
+    "攻速": ["攻击速度"], "施法": ["施法速度"],
+    "跑速": ["移动速度"], "移速": ["移动速度"],
+    "火抗": ["火焰抗性"], "冰抗": ["冰霜抗性"], "雷抗": ["闪电抗性"],
+    "电抗": ["闪电抗性"], "全抗": ["抗性"], "暴伤": ["暴击伤害"],
+}
+
+
+def expand_query(q: str) -> list:
+    """query → [原词] + 同义词展开(去重)。"""
+    out = [q]
+    for k, vs in SYNONYMS.items():
+        if k in q:
+            out.extend(v for v in vs if v not in out)
+    return out
+
+
 class SnapshotDB:
     """读写运行库。首次运行/快照升级时从插件自带快照复制一份到运行目录。"""
 
@@ -92,8 +112,10 @@ class SnapshotDB:
         q = query.strip()
         if not q:
             return []
-        sql = "SELECT * FROM mods WHERE (text LIKE ? OR name_cn LIKE ?)"
-        args = [f"%{q}%", f"%{q}%"]
+        terms = expand_query(q)
+        cond = " OR ".join(["text LIKE ?"] * len(terms) + ["name_cn LIKE ?"] * len(terms))
+        args = [f"%{t}%" for t in terms] * 2
+        sql = f"SELECT * FROM mods WHERE ({cond})"
         if item_class:
             sql += " AND item_class = ?"
             args.append(item_class)
@@ -102,6 +124,32 @@ class SnapshotDB:
         with self._lock:
             rows = self.conn.execute(sql, args).fetchall()
             return [dict(r) for r in rows]
+
+    def find_items_by_effect(self, effect: str, kind: str = "unique", limit: int = 8):
+        """按效果关键词反查装备(默认暗金),返回含匹配行。"""
+        q = effect.strip()
+        if not q:
+            return []
+        terms = expand_query(q)
+        cond = " OR ".join(["text LIKE ?"] * len(terms))
+        args = [f"%{t}%" for t in terms]
+        sql = f"SELECT * FROM items WHERE ({cond})"
+        if kind:
+            sql += " AND kind = ?"
+            args.append(kind)
+        # 效果行数多的优先(词条更丰富),名称短的优先
+        sql += " ORDER BY LENGTH(text) DESC LIMIT ?"
+        args.append(limit)
+        with self._lock:
+            rows = self.conn.execute(sql, args).fetchall()
+        out = []
+        for r in rows:
+            it = dict(r)
+            matched = [seg for seg in (it.get("text") or "").split(" | ")
+                       if any(t in seg for t in terms)]
+            it["matched_lines"] = matched[:4]
+            out.append(it)
+        return out
 
     def search_wiki(self, query: str, limit: int = 3):
         """全站页面文本搜索(其余类别兜底)。"""

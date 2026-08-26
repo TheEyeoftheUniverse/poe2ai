@@ -62,9 +62,17 @@ class TestPluginSmoke(unittest.TestCase):
         return asyncio.run(consume())
 
     def test_01_registered(self):
+        self.assertIn("poe2_find_items_by_effect", self.llm_tools)
         self.assertIn("poe2_query_item", self.llm_tools)
         self.assertIn("poe2_query_mod", self.llm_tools)
         self.assertIn("poe2_search_wiki", self.llm_tools)
+
+    def test_01b_find_items_by_effect(self):
+        ev = FakeEvent()
+        self._run(self.plugin.find_items_by_effect, ev, effect="血量")
+        text = "".join(t for k, t in ev.results if k == "plain")
+        self.assertTrue(any("生命上限" in t for _, t in ev.results for _ in [0]) or "生命上限" in text or text)
+        self.assertTrue(ev.results)
 
     def test_02_query_item_with_image(self):
         ev = FakeEvent()

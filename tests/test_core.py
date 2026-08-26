@@ -11,7 +11,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from core.db import SnapshotDB, format_item          # noqa: E402
+from core.db import SnapshotDB, format_item, expand_query          # noqa: E402
 from core.fetcher import Fetcher                     # noqa: E402
 
 BUNDLED = os.path.join(ROOT, "data", "poe2db.sqlite3")
@@ -28,6 +28,11 @@ class TestDB(unittest.TestCase):
     def tearDownClass(cls):
         cls.db.close()
         shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_00_expand_query(self):
+        self.assertIn("生命上限", expand_query("血量"))
+        self.assertIn("攻击速度", expand_query("攻速"))
+        self.assertEqual(expand_query("生命上限"), ["生命上限"])
 
     def test_01_stats(self):
         s = self.db.stats()
@@ -69,6 +74,14 @@ class TestDB(unittest.TestCase):
     def test_06_search_wiki(self):
         pages = self.db.search_wiki("升华")
         self.assertTrue(pages)
+
+    def test_05b_find_items_by_effect(self):
+        items = self.db.find_items_by_effect("生命上限", kind="unique", limit=6)
+        self.assertTrue(items)
+        self.assertTrue(all(it["matched_lines"] for it in items))
+        # 同义词:血量 → 也能命中生命上限
+        items2 = self.db.find_items_by_effect("血量", kind="unique", limit=6)
+        self.assertTrue(items2)
 
     def test_06b_search_reforge(self):
         rfs = self.db.search_reforge("布琳翰德印记")
