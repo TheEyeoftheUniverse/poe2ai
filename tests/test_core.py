@@ -36,6 +36,15 @@ class TestDB(unittest.TestCase):
         self.assertGreater(s["uniques"], 100)
         self.assertTrue(s["version"])
 
+    def test_01b_second_instantiation(self):
+        """第二次实例化(运行库已存在,走版本比较分支)不再报
+        tuple indices must be integers or slices"""
+        db2 = SnapshotDB(os.path.join(self.tmp, "poe2db.sqlite3"), BUNDLED)
+        try:
+            self.assertTrue(db2.stats()["items"] > 100)
+        finally:
+            db2.close()
+
     def test_02_search_item_cn_unique(self):
         items = self.db.search_item("猎首")
         self.assertTrue(items and items[0]["kind"] == "unique")

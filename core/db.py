@@ -23,7 +23,9 @@ class SnapshotDB:
         c = conn or self.conn
         try:
             r = c.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
-            return r["value"] if r else ""
+            if not r:
+                return ""
+            return r["value"] if not isinstance(r, tuple) else r[0]
         except sqlite3.Error:
             return ""
 
@@ -35,9 +37,11 @@ class SnapshotDB:
         if not need:
             try:
                 src = sqlite3.connect(self.bundled)
+                src.row_factory = sqlite3.Row
                 src_v = self._meta("version", src)
                 src.close()
                 dst = sqlite3.connect(self.path)
+                dst.row_factory = sqlite3.Row
                 dst_v = self._meta("version", dst)
                 dst.close()
                 need = src_v != dst_v  # 插件升级带来新快照版本
