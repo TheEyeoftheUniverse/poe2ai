@@ -4,3 +4,7 @@ __pycache__/
 .idea/
 .vscode/
 .DS_Store
+tools/.cache/
+data_runtime/
+*.sqlite3-wal
+*.sqlite3-shm

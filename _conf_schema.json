@@ -1,0 +1,24 @@
+{
+  "enable_fetch": {
+    "description": "允许本地查不到时联网 poe2db.tw 兜底抓取",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后仅使用本地快照,不再发出任何网络请求"
+  },
+  "fetch_interval": {
+    "description": "兜底抓取的最小间隔(秒)",
+    "type": "float",
+    "default": 2.0,
+    "hint": "礼貌限频,避免请求过密"
+  },
+  "max_items": {
+    "description": "装备查询单次返回条数上限",
+    "type": "int",
+    "default": 5
+  },
+  "max_mods": {
+    "description": "词条查询单次返回条数上限",
+    "type": "int",
+    "default": 20
+  }
+}
