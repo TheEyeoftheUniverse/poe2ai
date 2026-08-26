@@ -66,6 +66,7 @@ class Poe2Ai(Star):
             fetched = bool(items)
         if not items:
             yield event.plain_result(f"本地快照与在线兜底均未找到「{query}」。请确认名称,或提醒用户检查拼写。")
+            return
         text = "\n\n".join(format_item(it) for it in items)
         if fetched:
             text = "(在线兜底已抓取并入库)\n" + text
@@ -87,6 +88,7 @@ class Poe2Ai(Star):
         mods = self.db.search_mod(query, item_class=item_class, limit=limit)
         if not mods:
             yield event.plain_result(f"本地快照未找到词条「{query}」。可尝试换用效果文本关键词,如「生命上限」「攻击速度提高」")
+            return
         by_name = {}
         for m in mods:
             by_name.setdefault(m["name_cn"] or query, []).append(m)
@@ -110,6 +112,7 @@ class Poe2Ai(Star):
         pages = self.db.search_wiki(query, limit=3)
         if not pages:
             yield event.plain_result(f"全站快照未搜到「{query}」。")
+            return
         out = []
         for p in pages:
             out.append(f"【{p['title']}】({p['slug']})\n{p['excerpt']}")
