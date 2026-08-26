@@ -46,6 +46,8 @@ class Fetcher:
 
     async def fetch_page(self, slug: str):
         """抓取 /cn/<slug> 整页并解析入库,返回是否成功。"""
+        if not self.enabled:
+            return False
         html = await self._throttled_get(f"{BASE}/cn/{slug}")
         if not html:
             return False
