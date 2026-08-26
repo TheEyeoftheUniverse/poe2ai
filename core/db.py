@@ -189,7 +189,7 @@ class SnapshotDB:
             rows = self.conn.execute(sql, args).fetchall()
             return [dict(r) for r in rows]
 
-    def find_items_by_effect(self, effect: str, kind: str = "unique", limit: int = 8):
+    def find_items_by_effect(self, effect: str, kind: str = "unique", limit: int = 20):
         """按效果关键词反查装备(默认暗金),返回含匹配行。"""
         q = effect.strip()
         if not q:
@@ -211,7 +211,7 @@ class SnapshotDB:
             it = dict(r)
             matched = [seg for seg in (it.get("text") or "").split(" | ")
                        if any(t in seg for t in terms)]
-            it["matched_lines"] = matched[:4]
+            it["matched_lines"] = matched[:2]
             out.append(it)
         return out
 

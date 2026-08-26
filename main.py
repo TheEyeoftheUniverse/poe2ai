@@ -88,13 +88,13 @@ class Poe2Ai(Star):
 
     @filter.llm_tool(name="poe2_find_items_by_effect")
     async def find_items_by_effect(self, event: AstrMessageEvent, effect: str, kind: str = "unique"):
-        '''按效果反查 Path of Exile 2 的装备(默认查暗金/传奇)。当用户描述想要的效果但不知道装备名称时调用,例如"加很多血量的传奇是什么""哪个暗金加攻速"。effect 必须传从用户话里提炼的精炼效果关键词(2~8字,如"生命上限"、"攻击速度提高"、"闪电抗性"),绝不传用户原话整句。常见口语会自动归一:血量→生命上限、攻速→攻击速度、火抗→火焰抗性。
+        '''按效果反查 Path of Exile 2 的装备(默认查暗金/传奇)。当用户描述想要的效果但不知道装备名称时调用,例如"加很多血量的传奇是什么""哪个暗金加攻速"。effect 必须传从用户话里提炼的精炼效果关键词(2~8字,如"生命上限"、"攻击速度提高"、"闪电抗性"),绝不传用户原话整句。常见口语会自动归一:血量→生命上限、攻速→攻击速度、火抗→火焰抗性。当用户要求"列出/所有/全部 XX 词条的装备"清单时,一次本调用即返回完整列表(最多20条,含名称与匹配效果行),渲染为一张列表卡片图;严禁对结果中的每个装备再逐个调用 poe2_query_item。
 
         Args:
             effect(string): 精炼效果关键词,如"生命上限"
             kind(string): 可选,装备类别:unique=暗金(默认),base=普通基底,留空=全部
         '''
-        items = self.db.find_items_by_effect(effect, kind=kind, limit=8)
+        items = self.db.find_items_by_effect(effect, kind=kind, limit=20)
         if not items:
             return ("没有找到固定效果含「" + effect + "」的"
                     + ("暗金装备" if kind == "unique" else "装备")
@@ -105,7 +105,7 @@ class Poe2Ai(Star):
             if url:
                 await self._deliver_image(event, url)
         lines = []
-        for it in items[:8]:
+        for it in items:
             ml = "; ".join(it["matched_lines"][:2])
             lines.append("【" + it["name_cn"] + "】(" + (it["base_type"] or "") + ") " + ml)
         return "\n".join(lines)
