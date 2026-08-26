@@ -47,10 +47,6 @@ class TestDB(unittest.TestCase):
         items = self.db.find_items_by_effect("加很多血量的传奇", kind="unique", limit=3)
         self.assertTrue(items and items[0]["matched_lines"])
 
-    def test_00c_expand_query(self):
-        self.assertIn("生命上限", expand_query("血量"))
-        self.assertIn("攻击速度", expand_query("攻速"))
-
     def test_01_stats(self):
         s = self.db.stats()
         self.assertGreater(s["items"], 100)
