@@ -11,7 +11,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from core.db import SnapshotDB, format_item, expand_query          # noqa: E402
+from core.db import SnapshotDB, format_item          # noqa: E402
 from core.fetcher import Fetcher                     # noqa: E402
 
 BUNDLED = os.path.join(ROOT, "data", "poe2db.sqlite3")
