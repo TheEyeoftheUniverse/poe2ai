@@ -174,15 +174,23 @@ FIND_TMPL = """
 <div class="wrap">
   <div class="card">
     <div class="title">效果匹配:{{ effect }}</div>
-    <div class="sub">按固定效果反查{{ '暗金装备' if kind == 'unique' else '装备基底' }}</div>
-    {% for it in items %}
-      <div class="sep"></div>
-      <div class="pt">{{ it.name_cn }} <span class="bt">({{ it.base_type }})</span></div>
-      {% for l in it.matched_lines %}
-        <div class="ml">{{ l }}</div>
+    <div class="sub">按固定效果反查{{ '暗金装备' if kind == 'unique' else '装备基底' }} · 共 {{ items|length }} 件</div>
+    <div class="grid">
+      {% for c in cells %}
+        <div class="cell">
+          <div class="head">
+            {% if c.item.icon_url %}<img class="icon" src="{{ c.item.icon_url }}" onerror="this.style.display='none'">{% endif %}
+            <div>
+              <div class="name">{{ c.item.name_cn }}</div>
+              {% if c.item.base_type %}<div class="bt">{{ c.item.base_type }}</div>{% endif %}
+            </div>
+          </div>
+          {% for line, hit in c.lines %}
+            <div class="{{ 'ml' if hit else 'pl' }}">{{ line }}</div>
+          {% endfor %}
+        </div>
       {% endfor %}
-    {% endfor %}
-    <div class="sep"></div>
+    </div>
     <div class="foot">数据 poe2db.tw · 快照 {{ version }}</div>
   </div>
 </div>
@@ -193,21 +201,33 @@ FIND_TMPL = """
   .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
           border-radius: 14px; padding: 24px 28px 16px; }
   .title { font-size: 30px; font-weight: 700; color: #d0b86a; }
-  .sub { font-size: 18px; color: #7f7f7f; margin-top: 4px; }
-  .sep { height: 2px; background: #33333c; margin: 14px 0; }
-  .pt { color: #af6025; font-size: 24px; font-weight: 600; }
-  .bt { color: #7f7f7f; font-size: 17px; font-weight: 400; }
-  .ml { color: #8888ff; font-size: 19px; line-height: 1.7; }
-  .foot { color: #55555e; font-size: 15px; margin-top: 10px; }
+  .sub { font-size: 18px; color: #7f7f7f; margin: 4px 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .cell { background: #16161c; border: 1px solid #2a2a33; border-radius: 10px; padding: 12px 14px; }
+  .head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .icon { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: #0c0c10; flex-shrink: 0; }
+  .name { font-size: 18px; font-weight: 700; color: #af6025; line-height: 1.3; }
+  .bt { font-size: 12px; color: #7f7f7f; }
+  .ml { color: #8888ff; font-size: 13px; line-height: 1.6; font-weight: 600; }
+  .pl { color: #b9b9c2; font-size: 13px; line-height: 1.6; }
+  .foot { color: #55555e; font-size: 15px; margin-top: 12px; }
 </style>
 """
 
 
 async def render_find_card(plugin, effect, items, kind="unique") -> "str | None":
+    """列表卡:每件装备一张完整迷你卡(全部效果行,匹配行高亮),自适应 3~4 列网格。"""
+    cells = []
+    for it in items:
+        lines = []
+        for line in item_lines(it):
+            hit = line in (it.get("matched_lines") or [])
+            lines.append((line, hit))
+        cells.append({"item": it, "lines": lines})
     try:
         return await plugin.html_render(
-            FIND_TMPL, {"effect": effect, "items": items, "kind": kind,
-                        "version": plugin.db.stats()["version"]},
+            FIND_TMPL, {"effect": effect, "cells": cells, "kind": kind,
+                        "items": items, "version": plugin.db.stats()["version"]},
             options={"full_page": True, "type": "png"})
     except Exception:
         return None
