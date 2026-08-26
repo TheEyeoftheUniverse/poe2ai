@@ -29,10 +29,27 @@ class TestDB(unittest.TestCase):
         cls.db.close()
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def test_00_expand_query(self):
+    def test_00_refine_terms_colloquial(self):
+        """口语整句 → 官方术语归一(含上次线上报错原句)"""
+        cases = {
+            "加很多血量的传奇": ["生命上限"],
+            "我记得poe2有一个传奇是加很多血量的": ["生命上限"],
+            "攻速慢的武器": ["攻击速度"],
+            "哪个暗金火抗高": ["火焰抗性"],
+            "加大量最大生命 传奇 装备 POE2": ["生命"],
+        }
+        for q, expect_head in cases.items():
+            terms = self.db._refine_terms(q)
+            self.assertTrue(terms, q)
+            self.assertIn(expect_head[0], terms, f"{q} → {terms}")
+
+    def test_00b_find_colloquial(self):
+        items = self.db.find_items_by_effect("加很多血量的传奇", kind="unique", limit=3)
+        self.assertTrue(items and items[0]["matched_lines"])
+
+    def test_00c_expand_query(self):
         self.assertIn("生命上限", expand_query("血量"))
         self.assertIn("攻击速度", expand_query("攻速"))
-        self.assertEqual(expand_query("生命上限"), ["生命上限"])
 
     def test_01_stats(self):
         s = self.db.stats()
