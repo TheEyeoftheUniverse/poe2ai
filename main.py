@@ -120,50 +120,53 @@ class Poe2Ai(Star):
 
     # ---------- 运维指令 ----------
 
-    @filter.command_group("poe2")
-    def poe2(self):
-        """poe2db 快照查询与运维指令组"""
-        pass
-
-    @poe2.command("查")
-    async def lookup(self, event: AstrMessageEvent, name: str):
-        """直查装备: /poe2 查 猎首"""
-        items = self.db.search_item(name, limit=1)
-        if not items:
-            items = await self.fetcher.try_fetch_item(name)
-        if not items:
-            yield event.plain_result(f"没找到「{name}」")
-            return
-        it = items[0]
-        if it.get("icon_url"):
-            yield event.image_result(it["icon_url"])
-        yield event.plain_result(format_item(it))
-
-    @poe2.command("词条")
-    async def mod(self, event: AstrMessageEvent, text: str):
-        """直查词条: /poe2 词条 攻击速度提高"""
-        mods = self.db.search_mod(text, limit=15)
-        if not mods:
-            yield event.plain_result(f"没找到词条「{text}」")
-            return
-        parts = [f"{m['text']} ({m['item_class']}·{m['affix']}·需求{m['level']}级)" for m in mods[:12]]
-        yield event.plain_result("\n".join(parts))
-
-    @poe2.command("刷新")
-    async def refresh(self, event: AstrMessageEvent, page: str = "Unique_item"):
-        """重拉指定页面(如 Unique_item、Amulets): /poe2 刷新 Amulets"""
-        yield event.plain_result(f"正在从 poe2db.tw 拉取 /cn/{page} …")
-        ok = await self.fetcher.fetch_page(page)
-        if ok:
+    @filter.command("poe2")
+    async def poe2(self, event: AstrMessageEvent, name: str = "", extra: str = ""):
+        """poe2db 快照直查: /poe2 <装备名> ;词条/刷新/统计为子功能"""
+        if name == "统计":
             s = self.db.stats()
-            yield event.plain_result(f"已刷新 /cn/{page} 并入库。当前:物品 {s['items']}/词条 {s['mods']}/页面 {s['pages']}")
+            yield event.plain_result(
+                "poe2db 快照 v" + s["version"] + "(构建于 " + s["built_at"] + "):\n"
+                "物品 " + str(s["items"]) + "(含暗金 " + str(s["uniques"]) + ") / "
+                "词条 " + str(s["mods"]) + " / 页面 " + str(s["pages"]))
+        elif name == "刷新":
+            page = extra or "Unique_item"
+            yield event.plain_result("正在从 poe2db.tw 拉取 /cn/" + page + " …")
+            ok = await self.fetcher.fetch_page(page)
+            if ok:
+                s = self.db.stats()
+                yield event.plain_result(
+                    "已刷新 /cn/" + page + " 并入库。当前:物品 " + str(s["items"])
+                    + "/词条 " + str(s["mods"]) + "/页面 " + str(s["pages"]))
+            else:
+                yield event.plain_result(
+                    "拉取 /cn/" + page + " 失败(页面不存在或网络错误)。"
+                    "全量重建请用仓库内 tools/crawl.py + build_snapshot.py。")
+        elif name == "词条":
+            if not extra:
+                yield event.plain_result("用法: /poe2 词条 <效果文本>,如 /poe2 词条 攻击速度提高")
+                return
+            mods = self.db.search_mod(extra, limit=15)
+            if not mods:
+                yield event.plain_result("没找到词条「" + extra + "」")
+                return
+            parts = [m["text"] + " (" + m["item_class"] + "·" + m["affix"]
+                     + "·需求" + m["level"] + "级)" for m in mods[:12]]
+            yield event.plain_result("\n".join(parts))
+        elif name:
+            items = self.db.search_item(name, limit=1)
+            if not items:
+                items = await self.fetcher.try_fetch_item(name)
+            if not items:
+                yield event.plain_result("没找到「" + name + "」")
+                return
+            it = items[0]
+            if it.get("icon_url"):
+                yield event.image_result(it["icon_url"])
+            yield event.plain_result(format_item(it))
         else:
-            yield event.plain_result(f"拉取 /cn/{page} 失败(页面不存在或网络错误)。全量重建请用仓库内 tools/crawl.py + build_snapshot.py。")
-
-    @poe2.command("统计")
-    async def stats(self, event: AstrMessageEvent):
-        """快照统计"""
-        s = self.db.stats()
-        yield event.plain_result(
-            f"poe2db 快照 v{s['version']}(构建于 {s['built_at']}):\n"
-            f"物品 {s['items']}(含暗金 {s['uniques']}) / 词条 {s['mods']} / 页面 {s['pages']}")
+            yield event.plain_result(
+                "poe2ai 用法:\n/poe2 <装备名> — 直查装备(带图)\n"
+                "/poe2 词条 <效果> — 查词条各 tier\n"
+                "/poe2 刷新 <页> — 重拉指定页面\n/poe2 统计 — 快照统计\n"
+                "日常提问直接用自然语言即可,LLM 会自动调用查询工具。")

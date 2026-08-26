@@ -92,8 +92,21 @@ class TestPluginSmoke(unittest.TestCase):
 
     def test_06_stats_cmd(self):
         ev = FakeEvent()
-        self._run(self.plugin.stats, ev)
+        self._run(self.plugin.poe2, ev, name="统计")
         self.assertTrue(any("快照" in t for _, t in ev.results))
+
+    def test_07_lookup_direct(self):
+        """新指令形态: /poe2 猎首 不带「查」字"""
+        ev = FakeEvent()
+        self._run(self.plugin.poe2, ev, name="猎首")
+        kinds = [k for k, _ in ev.results]
+        self.assertIn("image", kinds)
+        self.assertTrue(any("猎首" in t for _, t in ev.results))
+
+    def test_08_lookup_miss(self):
+        ev = FakeEvent()
+        self._run(self.plugin.poe2, ev, name="不存在装备xyzq")
+        self.assertTrue(any("没找到" in t for _, t in ev.results))
 
 
 if __name__ == "__main__":
