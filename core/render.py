@@ -25,6 +25,13 @@ ITEM_TMPL = """
         <div class="prop">{{ p }}</div>
       {% endif %}
     {% endfor %}
+    {% if reforges %}
+      <div class="sep"></div>
+      <div class="rtitle">⚙ 重铸</div>
+      {% for rf in reforges %}
+        <div class="rforge">{{ rf.materials_text }} → <b>{{ rf.product_cn }}</b></div>
+      {% endfor %}
+    {% endif %}
     <div class="sep"></div>
     <div class="foot">{{ item.name_en }} · 数据 poe2db.tw · 快照 {{ version }}</div>
   </div>
@@ -47,6 +54,8 @@ ITEM_TMPL = """
   .prop { color: #c8c8c8; font-size: 21px; line-height: 1.8; }
   .mod { color: #8888ff; font-size: 21px; line-height: 1.8; }
   .foot { color: #55555e; font-size: 15px; margin-top: 10px; }
+  .rtitle { color: #d0b86a; font-size: 20px; font-weight: 700; }
+  .rforge { color: #c8c8c8; font-size: 19px; line-height: 1.8; }
 </style>
 """
 
@@ -84,6 +93,8 @@ MODS_TMPL = """
   .text { color: #8888ff; font-size: 20px; }
   .meta { color: #7f7f7f; font-size: 16px; margin-top: 2px; }
   .foot { color: #55555e; font-size: 15px; margin-top: 10px; }
+  .rtitle { color: #d0b86a; font-size: 20px; font-weight: 700; }
+  .rforge { color: #c8c8c8; font-size: 19px; line-height: 1.8; }
 </style>
 """
 
@@ -114,6 +125,8 @@ WIKI_TMPL = """
   .pe { color: #9a9aa4; font-size: 18px; line-height: 1.7; margin-top: 6px;
         display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
   .foot { color: #55555e; font-size: 15px; margin-top: 10px; }
+  .rtitle { color: #d0b86a; font-size: 20px; font-weight: 700; }
+  .rforge { color: #c8c8c8; font-size: 19px; line-height: 1.8; }
 </style>
 """
 
@@ -130,6 +143,7 @@ async def render_item_card(plugin, item) -> "str | None":
     try:
         return await plugin.html_render(
             ITEM_TMPL, {"item": item, "lines": item_lines(item),
+                        "reforges": plugin.db.search_reforge(item["name_cn"]),
                         "version": plugin.db.stats()["version"]},
             options={"full_page": True, "type": "png"})
     except Exception:

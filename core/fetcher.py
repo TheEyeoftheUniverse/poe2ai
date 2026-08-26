@@ -8,7 +8,7 @@ import re
 import time
 
 from .parse import BASE, EQUIP_PAGES, AFFIX_GEN, parse_cards, extract_modsview, \
-    html_to_text, page_text, page_title
+    html_to_text, page_text, page_title, parse_reforge_recipes
 
 UA = "Mozilla/5.0 (Macintosh) poe2ai-fetcher/1.0 (+github:TheEyeoftheUniverse/poe2ai)"
 
@@ -72,6 +72,11 @@ class Fetcher:
         title = page_title(html, slug)
         name = slug.split("/")[-1]
         self.db.upsert_page("/cn/" + slug, title, "", page_text(html))
+        if name == "Reforging_Bench":
+            rows = [(p, ph, json.dumps(mats, ensure_ascii=False), " + ".join(n for n, _ in mats))
+                    for p, ph, mats in parse_reforge_recipes(html)]
+            if rows:
+                self.db.upsert_reforges(rows)
         cards = parse_cards(html)
         item_rows = []
         for c in cards:

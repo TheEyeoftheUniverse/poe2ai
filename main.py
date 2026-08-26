@@ -77,7 +77,15 @@ class Poe2Ai(Star):
         if not items:
             yield event.plain_result(f"本地快照与在线兜底均未找到「{query}」。请确认名称,或提醒用户检查拼写。")
             return
-        text = "\n\n".join(format_item(it) for it in items)
+        texts = []
+        for it in items:
+            t = format_item(it)
+            rfs = self.db.search_reforge(it["name_cn"])
+            if rfs:
+                t += "\n· 可重铸: " + "; ".join(
+                    f"{r['materials_text']} → {r['product_cn']}" for r in rfs[:2])
+            texts.append(t)
+        text = "\n\n".join(texts)
         if fetched:
             text = "(在线兜底已抓取并入库)\n" + text
         # FR-3:排版卡片图(含 icon),渲染失败回退裸 icon 外链

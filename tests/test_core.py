@@ -70,6 +70,12 @@ class TestDB(unittest.TestCase):
         pages = self.db.search_wiki("升华")
         self.assertTrue(pages)
 
+    def test_06b_search_reforge(self):
+        rfs = self.db.search_reforge("布琳翰德印记")
+        self.assertTrue(rfs)
+        self.assertIn("布琳翰德印记之遗产", rfs[0]["product_cn"])
+        self.assertIn("奥杜尔的遗产", rfs[0]["materials_text"])
+
     def test_07_format_item(self):
         items = self.db.search_item("猎首")
         text = format_item(items[0])

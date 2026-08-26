@@ -139,6 +139,27 @@ class SnapshotDB:
                 "drop_chance,text,page_slug) VALUES(?,?,?,?,?,?,?,?,?)", rows)
             self.conn.commit()
 
+    def upsert_reforges(self, rows):
+        """rows: [(product_cn, product_en, materials_json, materials_text)]"""
+        with self._lock:
+            self.conn.execute("DELETE FROM reforges")
+            self.conn.executemany(
+                "INSERT INTO reforges(product_cn,product_en,materials,materials_text)"
+                " VALUES(?,?,?,?)", rows)
+            self.conn.commit()
+
+    def search_reforge(self, name: str, limit: int = 3):
+        """反查重铸配方:该物品作材料能铸出什么/它本身是什么的产物。"""
+        q = name.strip()
+        if not q:
+            return []
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM reforges WHERE materials_text LIKE ? OR product_cn LIKE ?"
+                " ORDER BY (materials_text LIKE ?) DESC LIMIT ?",
+                (f"%{q}%", f"%{q}%", f"%{q}%", limit)).fetchall()
+            return [dict(r) for r in rows]
+
     def stats(self):
         with self._lock:
             out = {}

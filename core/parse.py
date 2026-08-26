@@ -116,3 +116,23 @@ def page_text(html):
 def page_title(html, fallback=""):
     mt = TITLE_RE.search(html)
     return html_mod.unescape(mt.group(1).split("-")[0].strip()) if mt else fallback
+
+
+ROW_RE = re.compile(r"<tr><td>(.*?)</td><td>(.*?)</td></tr>", re.S)
+
+
+def parse_reforge_recipes(html):
+    """解析重铸台(Reforging_Bench)配方表 → [(产物名, 产物slug, [(材料名, 材料slug), ...])]."""
+    recipes = []
+    for m in ROW_RE.finditer(html):
+        prod_a = A_RE.search(m.group(1))
+        if not prod_a:
+            continue
+        product = _clean(prod_a.group(2))
+        prod_href = prod_a.group(1).rstrip("/").split("/")[-1]
+        mats = [(_clean(a.group(2)), a.group(1).rstrip("/").split("/")[-1])
+                for a in A_RE.finditer(m.group(2))]
+        mats = [(n, hf) for n, hf in mats if n]
+        if product and mats:
+            recipes.append((product, prod_href, mats))
+    return recipes

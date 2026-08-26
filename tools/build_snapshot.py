@@ -26,7 +26,8 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
 
 from core.parse import (EQUIP_PAGES, AFFIX_GEN, parse_cards, extract_modsview,
-                        html_to_text, page_text, page_title, TITLE_RE)
+                        html_to_text, page_text, page_title, TITLE_RE,
+                        parse_reforge_recipes)
 
 def slug_of(fname):
     return "/cn/" + fname[:-5].replace("__", "/")
@@ -36,7 +37,8 @@ def build(cache_dir, db_path):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.executescript("""
-    DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS mods; DROP TABLE IF EXISTS pages; DROP TABLE IF EXISTS meta;
+    DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS mods; DROP TABLE IF EXISTS pages;
+    DROP TABLE IF EXISTS reforges; DROP TABLE IF EXISTS meta;
     CREATE TABLE items(
       id INTEGER PRIMARY KEY, kind TEXT, name_cn TEXT, name_en TEXT,
       base_type TEXT, category TEXT, icon_url TEXT, page_slug TEXT,
@@ -50,11 +52,15 @@ def build(cache_dir, db_path):
     CREATE INDEX idx_mods_name ON mods(name_cn);
     CREATE TABLE pages(
       slug TEXT PRIMARY KEY, title TEXT, category TEXT, text TEXT);
+    CREATE TABLE reforges(
+      id INTEGER PRIMARY KEY, product_cn TEXT, product_en TEXT,
+      materials TEXT, materials_text TEXT);
+    CREATE INDEX idx_reforge_mat ON reforges(materials_text);
     CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
     """)
 
     files = sorted(f for f in os.listdir(cache_dir) if f.endswith(".html"))
-    stat = {"items": 0, "uniques": 0, "mods": 0, "pages": 0}
+    stat = {"items": 0, "uniques": 0, "mods": 0, "pages": 0, "reforges": 0}
     t0 = time.time()
     for fname in files:
         slug = slug_of(fname)
@@ -112,6 +118,14 @@ def build(cache_dir, db_path):
                      json.dumps(card.get("lines", []), ensure_ascii=False),
                      " | ".join(card.get("lines", []))))
                 stat["uniques"] += 1
+        if name == "Reforging_Bench":
+            for product, prod_href, mats in parse_reforge_recipes(raw):
+                c.execute(
+                    "INSERT INTO reforges(product_cn,product_en,materials,materials_text)"
+                    " VALUES(?,?,?,?)",
+                    (product, prod_href, json.dumps(mats, ensure_ascii=False),
+                     " + ".join(n for n, _ in mats)))
+                stat["reforges"] += 1
         # 所有页入通用表
         txt = page_text(raw)
         cat = EQUIP_PAGES.get(name, (None, None))
@@ -121,11 +135,12 @@ def build(cache_dir, db_path):
 
     c.execute("INSERT INTO meta VALUES('built_at',?)", (time.strftime("%Y-%m-%d %H:%M:%S"),))
     c.execute("INSERT INTO meta VALUES('pages',?)", (str(stat["pages"]),))
-    c.execute("INSERT INTO meta VALUES('version',?)", (time.strftime("%Y%m%d"),))
+    c.execute("INSERT INTO meta VALUES('version',?)",
+              (time.strftime("%Y%m%d") + "." + time.strftime("%H%M"),))
     conn.commit()
     conn.close()
     print(f"构建完成 {time.time()-t0:.0f}s: pages={stat['pages']} items={stat['items']} "
-          f"uniques={stat['uniques']} mods={stat['mods']}")
+          f"uniques={stat['uniques']} mods={stat['mods']} reforges={stat['reforges']}")
     print(f"DB: {db_path} ({os.path.getsize(db_path)/1e6:.1f}MB)")
 
 
