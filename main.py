@@ -16,6 +16,8 @@ from .core.render import render_item_card, render_mods_card, render_wiki_card, r
 
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 BUNDLED_DB = os.path.join(PLUGIN_DIR, "data", "poe2db.sqlite3")
+# v4.23.1+ 才有 on_agent_done 钩子:有则"过程只记不发、agent 收尾发最终卡";无则退化为工具直接发
+_AGENT_DONE_SUPPORTED = hasattr(filter, "on_agent_done")
 
 
 def _runtime_dir() -> str:
@@ -38,6 +40,7 @@ class Poe2Ai(Star):
         self.config = config or {}
         runtime_db = os.path.join(_runtime_dir(), "poe2db.sqlite3")
         self.db = SnapshotDB(runtime_db, BUNDLED_DB)
+        self._pending_img = {}   # message_id -> 待发卡片 URL(同一轮多次工具调用只留最后一张)
         self.fetcher = Fetcher(
             self.db,
             min_interval=self.config.get("fetch_interval", 2.0),
@@ -49,6 +52,20 @@ class Poe2Ai(Star):
 
     async def terminate(self):
         self.db.close()
+
+    def _queue_image(self, event, url: str):
+        """过程不发图:记入待发槽(覆盖式,只留最后一次工具的卡)。"""
+        mid = getattr(getattr(event, "message_obj", None), "message_id", None) or id(event)
+        self._pending_img[mid] = url
+        if len(self._pending_img) > 50:  # 防泄漏
+            self._pending_img.pop(next(iter(self._pending_img)))
+
+    async def _deliver_image(self, event, url: str):
+        """有 agent_done 钩子→入队等收尾;没有→立即发(旧版行为)。"""
+        if _AGENT_DONE_SUPPORTED:
+            self._queue_image(event, url)
+        else:
+            await self._send(event, event.image_result(url))
 
     @staticmethod
     async def _send(event, result):
@@ -82,7 +99,11 @@ class Poe2Ai(Star):
             return ("没有找到固定效果含「" + effect + "」的"
                     + ("暗金装备" if kind == "unique" else "装备")
                     + "。可换更短的关键词(如「生命上限」「抗性」)。")
-        # 多结果列表不发图,数据交 LLM 出结论;用户想看详情会追问装备名(query_item 发单品卡)
+        # 多结果卡也渲染,但走入队:若本轮模型后续点名查了装备,会被单品卡覆盖(只发最终结论的卡)
+        if self.config.get("render_image", True):
+            url = await render_find_card(self, effect, items, kind)
+            if url:
+                await self._deliver_image(event, url)
         lines = []
         for it in items[:8]:
             ml = "; ".join(it["matched_lines"][:2])
@@ -120,10 +141,10 @@ class Poe2Ai(Star):
         if self.config.get("render_image", True):
             url = await render_item_card(self, items[0])
             if url:
-                await self._send(event, event.image_result(url))
+                await self._deliver_image(event, url)
                 rendered = True
         if not rendered and items[0].get("icon_url"):
-            await self._send(event, event.image_result(items[0]["icon_url"]))
+            await self._deliver_image(event, items[0]["icon_url"])
         return text
 
     @filter.llm_tool(name="poe2_query_mod")
@@ -141,6 +162,11 @@ class Poe2Ai(Star):
         by_name = {}
         for m in mods:
             by_name.setdefault(m["name_cn"] or query, []).append(m)
+        if self.config.get("render_image", True):
+            groups = [(name, group[:8]) for name, group in list(by_name.items())[:5]]
+            url = await render_mods_card(self, query, groups, item_class)
+            if url:
+                await self._deliver_image(event, url)
         lines = []
         for name, group in list(by_name.items())[:5]:
             parts = []
@@ -161,10 +187,22 @@ class Poe2Ai(Star):
         pages = self.db.search_wiki(query, limit=3)
         if not pages:
             return "全站快照未搜到「" + query + "」。"
+        if self.config.get("render_image", True):
+            url = await render_wiki_card(self, query, pages)
+            if url:
+                await self._deliver_image(event, url)
         out = []
         for p in pages:
             out.append("【" + p["title"] + "】(" + p["slug"] + ")\n" + p["excerpt"])
         return "\n\n".join(out)
+
+    @filter.on_agent_done()
+    async def on_agent_done(self, event, run_context=None, resp=None):
+        """agent 轮次收尾:发本轮最后记录的卡片图(过程不刷图,最终结果配图)。"""
+        mid = getattr(getattr(event, "message_obj", None), "message_id", None) or id(event)
+        url = self._pending_img.pop(mid, None)
+        if url:
+            await self._send(event, event.image_result(url))
 
     # ---------- 运维指令 ----------
 

@@ -21,6 +21,12 @@ class _Filter:
             return f
         return deco
 
+    def on_agent_done(self, *a, **k):
+        def deco(f):
+            f._is_agent_done_hook = True
+            return f
+        return deco
+
     class EventMessageType:
         ALL = "all"
 

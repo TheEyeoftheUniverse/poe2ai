@@ -14,11 +14,20 @@ sys.path.insert(0, os.path.join(HERE, "astrbot_stub"))  # astrbot stub 优先
 sys.path.insert(0, ROOT)
 
 
+class _MsgObj:
+    def __init__(self, mid):
+        self.message_id = mid
+
+
 class FakeEvent:
+    _next_id = [0]
+
     def __init__(self, role="member"):
+        FakeEvent._next_id[0] += 1
         self.role = role
         self.results = []
         self.sent = []          # event.send() 主动发送的消息
+        self.message_obj = _MsgObj(FakeEvent._next_id[0])
 
     async def send(self, result):
         self.sent.append(result)
@@ -77,21 +86,42 @@ class TestPluginSmoke(unittest.TestCase):
         self.assertIn("poe2_search_wiki", self.llm_tools)
 
     def test_01b_find_items_by_effect(self):
-        """多结果工具不发图,只 return 数据给 LLM 出结论"""
-        ev = FakeEvent()
-        ret = self._call_tool(self.plugin.find_items_by_effect, ev, effect="血量")
-        self.assertIsInstance(ret, str)
-        self.assertIn("生命上限", ret)
-        self.assertEqual(ev.sent, [])
+        """多结果工具:过程只入队不刷图,agent 收尾发最终卡"""
+        async def fake_render(plugin, effect, items, kind="unique"):
+            return "http://fake/find.png"
+        orig = self.mod.render_find_card
+        self.mod.render_find_card = fake_render
+        try:
+            ev = FakeEvent()
+            ret = self._call_tool(self.plugin.find_items_by_effect, ev, effect="血量")
+            self.assertIsInstance(ret, str)
+            self.assertIn("生命上限", ret)
+            self.assertEqual(ev.sent, [])          # 过程未发
+            mid = ev.message_obj.message_id
+            self.assertIn(mid, self.plugin._pending_img)  # 已入队
+            asyncio.run(self.plugin.on_agent_done(ev))     # agent 收尾
+            self.assertEqual([k for k, _ in ev.sent], ["image"])  # 收尾发出最终卡
+        finally:
+            self.mod.render_find_card = orig
 
     def test_02_query_item_with_image(self):
-        """llm_tool 新形态:数据 return 给 LLM,图经 event.send 主动发,不再 yield 刷屏"""
+        """单品卡延迟发:数据 return 给 LLM,图入队,agent 收尾才发"""
         ev = FakeEvent()
         ret = self._call_tool(self.plugin.query_item, ev, query="猎首")
         self.assertIsInstance(ret, str)
         self.assertIn("猎首", ret)
         self.assertIn("重革腰带", ret)
+        self.assertEqual(ev.sent, [])     # 过程未发
+        asyncio.run(self.plugin.on_agent_done(ev))
         self.assertEqual([k for k, _ in ev.sent], ["image"])
+
+    def test_02b_multi_tool_only_last_image(self):
+        """同一轮多工具调用:只发最后一张卡(覆盖式入队)"""
+        ev = FakeEvent()
+        self._call_tool(self.plugin.find_items_by_effect, ev, effect="血量")
+        self._call_tool(self.plugin.query_item, ev, query="猎首")
+        asyncio.run(self.plugin.on_agent_done(ev))
+        self.assertEqual(len(ev.sent), 1)  # 只一张
 
     def test_03_query_item_miss(self):
         ret = self._call_tool(self.plugin.query_item, FakeEvent(), query="不存在的装备xyzq")
