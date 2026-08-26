@@ -18,6 +18,10 @@ class FakeEvent:
     def __init__(self, role="member"):
         self.role = role
         self.results = []
+        self.sent = []          # event.send() 主动发送的消息
+
+    async def send(self, result):
+        self.sent.append(result)
 
     def plain_result(self, text):
         r = ("plain", text)
@@ -54,12 +58,17 @@ class TestPluginSmoke(unittest.TestCase):
                          and hasattr(getattr(cls.plugin, n), "_llm_tool_name")]
 
     def _run(self, handler, event, **kwargs):
+        """指令 handler(async generator)。"""
         async def consume():
             out = []
             async for r in handler(event, **kwargs):
                 out.append(r)
             return out
         return asyncio.run(consume())
+
+    def _call_tool(self, handler, event, **kwargs):
+        """llm_tool handler(普通 coroutine),返回工具结果字符串。"""
+        return asyncio.run(handler(event, **kwargs))
 
     def test_01_registered(self):
         self.assertIn("poe2_find_items_by_effect", self.llm_tools)
@@ -68,36 +77,32 @@ class TestPluginSmoke(unittest.TestCase):
         self.assertIn("poe2_search_wiki", self.llm_tools)
 
     def test_01b_find_items_by_effect(self):
-        ev = FakeEvent()
-        self._run(self.plugin.find_items_by_effect, ev, effect="血量")
-        text = "".join(t for k, t in ev.results if k == "plain")
-        self.assertTrue(any("生命上限" in t for _, t in ev.results for _ in [0]) or "生命上限" in text or text)
-        self.assertTrue(ev.results)
+        ret = self._call_tool(self.plugin.find_items_by_effect,
+                              FakeEvent(), effect="血量")
+        self.assertIsInstance(ret, str)
+        self.assertIn("生命上限", ret)
 
     def test_02_query_item_with_image(self):
+        """llm_tool 新形态:数据 return 给 LLM,图经 event.send 主动发,不再 yield 刷屏"""
         ev = FakeEvent()
-        self._run(self.plugin.query_item, ev, query="猎首")
-        kinds = [k for k, _ in ev.results]
-        self.assertIn("image", kinds)   # FR-3:信息与图片一起发
-        text = "".join(t for k, t in ev.results if k == "plain")
-        self.assertIn("猎首", text)
-        self.assertIn("重革腰带", text)
+        ret = self._call_tool(self.plugin.query_item, ev, query="猎首")
+        self.assertIsInstance(ret, str)
+        self.assertIn("猎首", ret)
+        self.assertIn("重革腰带", ret)
+        self.assertEqual([k for k, _ in ev.sent], ["image"])
 
     def test_03_query_item_miss(self):
-        ev = FakeEvent()
-        self._run(self.plugin.query_item, ev, query="不存在的装备xyzq")
-        self.assertTrue(any("未找到" in t for _, t in ev.results))
+        ret = self._call_tool(self.plugin.query_item, FakeEvent(), query="不存在的装备xyzq")
+        self.assertIn("未找到", ret)
 
     def test_04_query_mod(self):
-        ev = FakeEvent()
-        self._run(self.plugin.query_mod, ev, query="攻击速度提高", item_class="单手剑")
-        text = "".join(t for k, t in ev.results if k == "plain")
-        self.assertIn("攻击速度", text)
+        ret = self._call_tool(self.plugin.query_mod, FakeEvent(),
+                              query="攻击速度提高", item_class="单手剑")
+        self.assertIn("攻击速度", ret)
 
     def test_05_search_wiki(self):
-        ev = FakeEvent()
-        self._run(self.plugin.search_wiki, ev, query="升华")
-        self.assertTrue(any("升华" in t for _, t in ev.results))
+        ret = self._call_tool(self.plugin.search_wiki, FakeEvent(), query="升华")
+        self.assertIn("升华", ret)
 
     def test_06_stats_cmd(self):
         ev = FakeEvent()

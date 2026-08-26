@@ -51,6 +51,14 @@ class Poe2Ai(Star):
         self.db.close()
 
     @staticmethod
+    async def _send(event, result):
+        """主动发送消息(llm_tool 中 yield 会直接刷给用户,故用 send)。"""
+        try:
+            await event.send(result)
+        except Exception:
+            pass
+
+    @staticmethod
     def _is_admin(event) -> bool:
         """AstrBot 的 RoleType.ADMIN value 为 'admin';兼容枚举与字符串。"""
         role = getattr(event, "role", None)
@@ -71,19 +79,18 @@ class Poe2Ai(Star):
         '''
         items = self.db.find_items_by_effect(effect, kind=kind, limit=8)
         if not items:
-            yield event.plain_result(
-                "没有找到固定效果含「" + effect + "」的" + ("暗金装备" if kind == "unique" else "装备")
-                + "。可换更短的关键词(如「生命上限」「抗性」)。")
-            return
+            return ("没有找到固定效果含「" + effect + "」的"
+                    + ("暗金装备" if kind == "unique" else "装备")
+                    + "。可换更短的关键词(如「生命上限」「抗性」)。")
         if self.config.get("render_image", True):
             url = await render_find_card(self, effect, items, kind)
             if url:
-                yield event.image_result(url)
+                await self._send(event, event.image_result(url))
         lines = []
         for it in items[:8]:
             ml = "; ".join(it["matched_lines"][:2])
             lines.append("【" + it["name_cn"] + "】(" + (it["base_type"] or "") + ") " + ml)
-        yield event.plain_result("\n".join(lines))
+        return "\n".join(lines)
 
     @filter.llm_tool(name="poe2_query_item")
     async def query_item(self, event: AstrMessageEvent, query: str):
@@ -99,8 +106,7 @@ class Poe2Ai(Star):
             items = await self.fetcher.try_fetch_item(query)
             fetched = bool(items)
         if not items:
-            yield event.plain_result(f"本地快照与在线兜底均未找到「{query}」。请确认名称,或提醒用户检查拼写。")
-            return
+            return f"本地快照与在线兜底均未找到「{query}」。请确认名称,或提醒用户检查拼写。"
         texts = []
         for it in items:
             t = format_item(it)
@@ -117,11 +123,11 @@ class Poe2Ai(Star):
         if self.config.get("render_image", True):
             url = await render_item_card(self, items[0])
             if url:
-                yield event.image_result(url)
+                await self._send(event, event.image_result(url))
                 rendered = True
         if not rendered and items[0].get("icon_url"):
-            yield event.image_result(items[0]["icon_url"])
-        yield event.plain_result(text)
+            await self._send(event, event.image_result(items[0]["icon_url"]))
+        return text
 
     @filter.llm_tool(name="poe2_query_mod")
     async def query_mod(self, event: AstrMessageEvent, query: str, item_class: str = ""):
@@ -134,8 +140,7 @@ class Poe2Ai(Star):
         limit = int(self.config.get("max_mods", 20))
         mods = self.db.search_mod(query, item_class=item_class, limit=limit)
         if not mods:
-            yield event.plain_result(f"本地快照未找到词条「{query}」。可尝试换用效果文本关键词,如「生命上限」「攻击速度提高」")
-            return
+            return "本地快照未找到词条「" + query + "」。可尝试换用效果文本关键词,如「生命上限」「攻击速度提高」"
         by_name = {}
         for m in mods:
             by_name.setdefault(m["name_cn"] or query, []).append(m)
@@ -143,7 +148,7 @@ class Poe2Ai(Star):
             groups = [(name, group[:8]) for name, group in list(by_name.items())[:5]]
             url = await render_mods_card(self, query, groups, item_class)
             if url:
-                yield event.image_result(url)
+                await self._send(event, event.image_result(url))
         lines = []
         for name, group in list(by_name.items())[:5]:
             parts = []
@@ -152,7 +157,7 @@ class Poe2Ai(Star):
                 extra = [x for x in (m["item_class"], m["affix"], "需求" + m["level"] + "级") if x]
                 parts.append(seg + " (" + ", ".join(extra) + ")" if extra else seg)
             lines.append("【" + name + "】\n" + "\n".join(parts))
-        yield event.plain_result("\n\n".join(lines))
+        return "\n\n".join(lines)
 
     @filter.llm_tool(name="poe2_search_wiki")
     async def search_wiki(self, event: AstrMessageEvent, query: str):
@@ -163,16 +168,15 @@ class Poe2Ai(Star):
         '''
         pages = self.db.search_wiki(query, limit=3)
         if not pages:
-            yield event.plain_result(f"全站快照未搜到「{query}」。")
-            return
+            return "全站快照未搜到「" + query + "」。"
         if self.config.get("render_image", True):
             url = await render_wiki_card(self, query, pages)
             if url:
-                yield event.image_result(url)
+                await self._send(event, event.image_result(url))
         out = []
         for p in pages:
             out.append("【" + p["title"] + "】(" + p["slug"] + ")\n" + p["excerpt"])
-        yield event.plain_result("\n\n".join(out))
+        return "\n\n".join(out)
 
     # ---------- 运维指令 ----------
 
