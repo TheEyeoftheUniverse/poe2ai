@@ -37,7 +37,7 @@ ITEM_TMPL = """
   </div>
 </div>
 <style>
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; background: #121218; }
   .wrap { width: 100%; box-sizing: border-box; padding: 14px; background: #121218;
           font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
   .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
@@ -79,7 +79,7 @@ MODS_TMPL = """
   </div>
 </div>
 <style>
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; background: #121218; }
   .wrap { width: 100%; box-sizing: border-box; padding: 14px; background: #121218;
           font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
   .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
@@ -113,7 +113,7 @@ WIKI_TMPL = """
   </div>
 </div>
 <style>
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; background: #121218; }
   .wrap { width: 100%; box-sizing: border-box; padding: 14px; background: #121218;
           font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
   .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
