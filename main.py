@@ -82,10 +82,7 @@ class Poe2Ai(Star):
             return ("没有找到固定效果含「" + effect + "」的"
                     + ("暗金装备" if kind == "unique" else "装备")
                     + "。可换更短的关键词(如「生命上限」「抗性」)。")
-        if self.config.get("render_image", True):
-            url = await render_find_card(self, effect, items, kind)
-            if url:
-                await self._send(event, event.image_result(url))
+        # 多结果列表不发图,数据交 LLM 出结论;用户想看详情会追问装备名(query_item 发单品卡)
         lines = []
         for it in items[:8]:
             ml = "; ".join(it["matched_lines"][:2])
@@ -144,11 +141,6 @@ class Poe2Ai(Star):
         by_name = {}
         for m in mods:
             by_name.setdefault(m["name_cn"] or query, []).append(m)
-        if self.config.get("render_image", True):
-            groups = [(name, group[:8]) for name, group in list(by_name.items())[:5]]
-            url = await render_mods_card(self, query, groups, item_class)
-            if url:
-                await self._send(event, event.image_result(url))
         lines = []
         for name, group in list(by_name.items())[:5]:
             parts = []
@@ -169,10 +161,6 @@ class Poe2Ai(Star):
         pages = self.db.search_wiki(query, limit=3)
         if not pages:
             return "全站快照未搜到「" + query + "」。"
-        if self.config.get("render_image", True):
-            url = await render_wiki_card(self, query, pages)
-            if url:
-                await self._send(event, event.image_result(url))
         out = []
         for p in pages:
             out.append("【" + p["title"] + "】(" + p["slug"] + ")\n" + p["excerpt"])

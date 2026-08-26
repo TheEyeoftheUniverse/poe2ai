@@ -77,10 +77,12 @@ class TestPluginSmoke(unittest.TestCase):
         self.assertIn("poe2_search_wiki", self.llm_tools)
 
     def test_01b_find_items_by_effect(self):
-        ret = self._call_tool(self.plugin.find_items_by_effect,
-                              FakeEvent(), effect="血量")
+        """多结果工具不发图,只 return 数据给 LLM 出结论"""
+        ev = FakeEvent()
+        ret = self._call_tool(self.plugin.find_items_by_effect, ev, effect="血量")
         self.assertIsInstance(ret, str)
         self.assertIn("生命上限", ret)
+        self.assertEqual(ev.sent, [])
 
     def test_02_query_item_with_image(self):
         """llm_tool 新形态:数据 return 给 LLM,图经 event.send 主动发,不再 yield 刷屏"""
