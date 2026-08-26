@@ -116,7 +116,29 @@ class TestPluginSmoke(unittest.TestCase):
         self.assertFalse(any("仅管理员" in t for _, t in ev.results))
         self.assertTrue(any("拉取" in t or "正在" in t for _, t in ev.results))
 
-    def test_10_lookup_miss(self):
+    def test_10_render_item_card_path(self):
+        """monkeypatch html_render → 走卡片图路径,直查不再发纯文本"""
+        async def fake_html(tmpl, data, options=None):
+            return "http://fake/img.png"
+        self.plugin.html_render = fake_html
+        try:
+            ev = FakeEvent()
+            self._run(self.plugin.poe2, ev, name="猎首")
+            kinds = [k for k, _ in ev.results]
+            self.assertEqual(kinds, ["image"])  # 只有图,无纯文本
+        finally:
+            del self.plugin.html_render  # 回到 stub 无该方法 → fallback
+
+    def test_11_render_fallback_path(self):
+        """stub 无 html_render → 渲染失败自动回退 裸icon+纯文本"""
+        self.assertFalse(hasattr(self.plugin, "html_render"))
+        ev = FakeEvent()
+        self._run(self.plugin.poe2, ev, name="猎首")
+        kinds = [k for k, _ in ev.results]
+        self.assertIn("image", kinds)
+        self.assertIn("plain", kinds)
+
+    def test_12_lookup_miss(self):
         ev = FakeEvent()
         self._run(self.plugin.poe2, ev, name="不存在装备xyzq")
         self.assertTrue(any("没找到" in t for _, t in ev.results))

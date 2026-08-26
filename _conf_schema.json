@@ -1,4 +1,10 @@
 {
+  "render_image": {
+    "description": "查询结果渲染为 poe2db 风格排版卡片图",
+    "type": "bool",
+    "default": true,
+    "hint": "需要 AstrBot 文转图(Playwright)环境;关闭或渲染失败自动回退纯文本"
+  },
   "enable_fetch": {
     "description": "允许本地查不到时联网 poe2db.tw 兜底抓取",
     "type": "bool",

@@ -12,6 +12,7 @@ from astrbot.api.star import Context, Star, register
 
 from .core.db import SnapshotDB, format_item
 from .core.fetcher import Fetcher
+from .core.render import render_item_card, render_mods_card, render_wiki_card
 
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 BUNDLED_DB = os.path.join(PLUGIN_DIR, "data", "poe2db.sqlite3")
@@ -79,10 +80,15 @@ class Poe2Ai(Star):
         text = "\n\n".join(format_item(it) for it in items)
         if fetched:
             text = "(在线兜底已抓取并入库)\n" + text
-        # FR-3:信息与图片一起发送(icon 为 cdn 外链)
-        for it in items[:1]:
-            if it.get("icon_url"):
-                yield event.image_result(it["icon_url"])
+        # FR-3:排版卡片图(含 icon),渲染失败回退裸 icon 外链
+        rendered = False
+        if self.config.get("render_image", True):
+            url = await render_item_card(self, items[0])
+            if url:
+                yield event.image_result(url)
+                rendered = True
+        if not rendered and items[0].get("icon_url"):
+            yield event.image_result(items[0]["icon_url"])
         yield event.plain_result(text)
 
     @filter.llm_tool(name="poe2_query_mod")
@@ -101,14 +107,19 @@ class Poe2Ai(Star):
         by_name = {}
         for m in mods:
             by_name.setdefault(m["name_cn"] or query, []).append(m)
+        if self.config.get("render_image", True):
+            groups = [(name, group[:8]) for name, group in list(by_name.items())[:5]]
+            url = await render_mods_card(self, query, groups, item_class)
+            if url:
+                yield event.image_result(url)
         lines = []
         for name, group in list(by_name.items())[:5]:
             parts = []
             for m in group[:8]:
-                seg = f"{m['text']}"
-                extra = [x for x in (m["item_class"], m["affix"], f"需求{m['level']}级") if x]
-                parts.append(seg + f" ({', '.join(extra)})" if extra else seg)
-            lines.append(f"【{name}】\n" + "\n".join(parts))
+                seg = m["text"]
+                extra = [x for x in (m["item_class"], m["affix"], "需求" + m["level"] + "级") if x]
+                parts.append(seg + " (" + ", ".join(extra) + ")" if extra else seg)
+            lines.append("【" + name + "】\n" + "\n".join(parts))
         yield event.plain_result("\n\n".join(lines))
 
     @filter.llm_tool(name="poe2_search_wiki")
@@ -122,9 +133,13 @@ class Poe2Ai(Star):
         if not pages:
             yield event.plain_result(f"全站快照未搜到「{query}」。")
             return
+        if self.config.get("render_image", True):
+            url = await render_wiki_card(self, query, pages)
+            if url:
+                yield event.image_result(url)
         out = []
         for p in pages:
-            out.append(f"【{p['title']}】({p['slug']})\n{p['excerpt']}")
+            out.append("【" + p["title"] + "】(" + p["slug"] + ")\n" + p["excerpt"])
         yield event.plain_result("\n\n".join(out))
 
     # ---------- 运维指令 ----------
@@ -162,6 +177,15 @@ class Poe2Ai(Star):
             if not mods:
                 yield event.plain_result("没找到词条「" + extra + "」")
                 return
+            if self.config.get("render_image", True):
+                by_name = {}
+                for m in mods:
+                    by_name.setdefault(m["name_cn"] or extra, []).append(m)
+                groups = [(n, g[:8]) for n, g in list(by_name.items())[:5]]
+                url = await render_mods_card(self, extra, groups)
+                if url:
+                    yield event.image_result(url)
+                    return
             parts = [m["text"] + " (" + m["item_class"] + "·" + m["affix"]
                      + "·需求" + m["level"] + "级)" for m in mods[:12]]
             yield event.plain_result("\n".join(parts))
@@ -173,6 +197,11 @@ class Poe2Ai(Star):
                 yield event.plain_result("没找到「" + name + "」")
                 return
             it = items[0]
+            if self.config.get("render_image", True):
+                url = await render_item_card(self, it)
+                if url:
+                    yield event.image_result(url)
+                    return
             if it.get("icon_url"):
                 yield event.image_result(it["icon_url"])
             yield event.plain_result(format_item(it))
