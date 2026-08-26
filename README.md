@@ -36,7 +36,7 @@ git clone https://github.com/TheEyeoftheUniverse/poe2ai
 |---|---|
 | `/poe2 猎首` | 直查装备(带图) |
 | `/poe2 词条 攻击速度提高` | 直查词条各 tier |
-| `/poe2 刷新 Amulets` | 重拉指定页面入库(大版本更新后用) |
+| `/poe2 刷新 Amulets` | 重拉指定页面入库(仅管理员) |
 | `/poe2 统计` | 快照统计 |
 
 ## 快照构建(维护者)

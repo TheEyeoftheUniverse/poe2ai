@@ -15,7 +15,8 @@ sys.path.insert(0, ROOT)
 
 
 class FakeEvent:
-    def __init__(self):
+    def __init__(self, role="member"):
+        self.role = role
         self.results = []
 
     def plain_result(self, text):
@@ -103,7 +104,19 @@ class TestPluginSmoke(unittest.TestCase):
         self.assertIn("image", kinds)
         self.assertTrue(any("猎首" in t for _, t in ev.results))
 
-    def test_08_lookup_miss(self):
+    def test_08_refresh_denied_for_member(self):
+        ev = FakeEvent(role="member")
+        self._run(self.plugin.poe2, ev, name="刷新", extra="Amulets")
+        self.assertTrue(any("仅管理员" in t for _, t in ev.results))
+
+    def test_09_refresh_admin_passes_gate(self):
+        ev = FakeEvent(role="admin")
+        self._run(self.plugin.poe2, ev, name="刷新", extra="不存在的页面zzz")
+        # 管理员过闸后进入实际拉取(测试环境 fetcher disabled/页面不存在 → 报拉取失败而非无权限)
+        self.assertFalse(any("仅管理员" in t for _, t in ev.results))
+        self.assertTrue(any("拉取" in t or "正在" in t for _, t in ev.results))
+
+    def test_10_lookup_miss(self):
         ev = FakeEvent()
         self._run(self.plugin.poe2, ev, name="不存在装备xyzq")
         self.assertTrue(any("没找到" in t for _, t in ev.results))

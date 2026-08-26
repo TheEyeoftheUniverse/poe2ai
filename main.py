@@ -49,6 +49,15 @@ class Poe2Ai(Star):
     async def terminate(self):
         self.db.close()
 
+    @staticmethod
+    def _is_admin(event) -> bool:
+        """AstrBot 的 RoleType.ADMIN value 为 'admin';兼容枚举与字符串。"""
+        role = getattr(event, "role", None)
+        if role is None:
+            return False
+        v = getattr(role, "value", role)
+        return "admin" in str(v).lower()
+
     # ---------- LLM 工具(自然语言主路径) ----------
 
     @filter.llm_tool(name="poe2_query_item")
@@ -130,6 +139,9 @@ class Poe2Ai(Star):
                 "物品 " + str(s["items"]) + "(含暗金 " + str(s["uniques"]) + ") / "
                 "词条 " + str(s["mods"]) + " / 页面 " + str(s["pages"]))
         elif name == "刷新":
+            if not self._is_admin(event):
+                yield event.plain_result("刷新是运维指令,仅管理员可用。")
+                return
             page = extra or "Unique_item"
             yield event.plain_result("正在从 poe2db.tw 拉取 /cn/" + page + " …")
             ok = await self.fetcher.fetch_page(page)
