@@ -39,12 +39,12 @@ ITEM_TMPL = """
   .name { font-size: 22px; font-weight: 700; }
   .name.unique { color: #af6025; }
   .name.normal { color: #d0d0d0; }
-  .typeline { font-size: 15px; color: #af6025; margin-top: 2px; }
-  .sep { height: 1px; background: #33333c; margin: 10px 0; }
-  .req { color: #7f7f7f; font-size: 14px; line-height: 1.7; }
-  .prop { color: #c8c8c8; font-size: 15px; line-height: 1.7; }
-  .mod { color: #8888ff; font-size: 15px; line-height: 1.7; }
-  .foot { color: #55555e; font-size: 11px; margin-top: 8px; }
+  .typeline { font-size: 22px; color: #af6025; margin-top: 4px; }
+  .sep { height: 2px; background: #33333c; margin: 14px 0; }
+  .req { color: #7f7f7f; font-size: 20px; line-height: 1.8; }
+  .prop { color: #c8c8c8; font-size: 21px; line-height: 1.8; }
+  .mod { color: #8888ff; font-size: 21px; line-height: 1.8; }
+  .foot { color: #55555e; font-size: 15px; margin-top: 10px; }
 </style>
 """
 
@@ -68,18 +68,20 @@ MODS_TMPL = """
   </div>
 </div>
 <style>
-  .wrap { width: 460px; padding: 10px; background: transparent;
+  html, body { margin: 0; padding: 0; }
+  .wrap { width: 100%; box-sizing: border-box; padding: 14px; background: #121218;
           font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
-  .card { background: #0c0c10ee; border: 1px solid #33333c; border-radius: 10px; padding: 16px 18px 12px; }
-  .title { font-size: 20px; font-weight: 700; color: #d0b86a; }
-  .sub { font-size: 13px; color: #7f7f7f; margin-top: 2px; }
-  .sep { height: 1px; background: #33333c; margin: 10px 0; }
-  .gname { color: #af6025; font-size: 14px; margin-bottom: 4px; }
+  .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
+          border-radius: 14px; padding: 24px 28px 16px; }
+  .title { font-size: 30px; font-weight: 700; color: #d0b86a; }
+  .sub { font-size: 18px; color: #7f7f7f; margin-top: 4px; }
+  .sep { height: 2px; background: #33333c; margin: 14px 0; }
+  .gname { color: #af6025; font-size: 20px; margin-bottom: 6px; }
   .row { padding: 4px 0; border-bottom: 1px dashed #22222a; }
   .row:last-child { border-bottom: none; }
-  .text { color: #8888ff; font-size: 14px; }
-  .meta { color: #7f7f7f; font-size: 12px; margin-top: 1px; }
-  .foot { color: #55555e; font-size: 11px; margin-top: 8px; }
+  .text { color: #8888ff; font-size: 20px; }
+  .meta { color: #7f7f7f; font-size: 16px; margin-top: 2px; }
+  .foot { color: #55555e; font-size: 15px; margin-top: 10px; }
 </style>
 """
 
@@ -98,16 +100,18 @@ WIKI_TMPL = """
   </div>
 </div>
 <style>
-  .wrap { width: 460px; padding: 10px; background: transparent;
+  html, body { margin: 0; padding: 0; }
+  .wrap { width: 100%; box-sizing: border-box; padding: 14px; background: #121218;
           font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
-  .card { background: #0c0c10ee; border: 1px solid #33333c; border-radius: 10px; padding: 16px 18px 12px; }
-  .title { font-size: 20px; font-weight: 700; color: #d0b86a; }
-  .sep { height: 1px; background: #33333c; margin: 10px 0; }
-  .pt { color: #c8c8c8; font-size: 16px; font-weight: 600; }
-  .ps { color: #55555e; font-size: 11px; }
-  .pe { color: #9a9aa4; font-size: 13px; line-height: 1.6; margin-top: 4px;
+  .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
+          border-radius: 14px; padding: 24px 28px 16px; }
+  .title { font-size: 30px; font-weight: 700; color: #d0b86a; }
+  .sep { height: 2px; background: #33333c; margin: 14px 0; }
+  .pt { color: #c8c8c8; font-size: 24px; font-weight: 600; }
+  .ps { color: #55555e; font-size: 15px; }
+  .pe { color: #9a9aa4; font-size: 18px; line-height: 1.7; margin-top: 6px;
         display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
-  .foot { color: #55555e; font-size: 11px; margin-top: 8px; }
+  .foot { color: #55555e; font-size: 15px; margin-top: 10px; }
 </style>
 """
 
@@ -125,7 +129,7 @@ async def render_item_card(plugin, item) -> "str | None":
         return await plugin.html_render(
             ITEM_TMPL, {"item": item, "lines": item_lines(item),
                         "version": plugin.db.stats()["version"]},
-            options={"full_page": True})
+            options={"full_page": True, "type": "png"})
     except Exception:
         return None
 
@@ -135,7 +139,7 @@ async def render_mods_card(plugin, query, groups, item_class="") -> "str | None"
         return await plugin.html_render(
             MODS_TMPL, {"query": query, "groups": groups, "item_class": item_class,
                         "version": plugin.db.stats()["version"]},
-            options={"full_page": True})
+            options={"full_page": True, "type": "png"})
     except Exception:
         return None
 
@@ -145,6 +149,6 @@ async def render_wiki_card(plugin, query, pages) -> "str | None":
         return await plugin.html_render(
             WIKI_TMPL, {"query": query, "pages": pages,
                         "version": plugin.db.stats()["version"]},
-            options={"full_page": True})
+            options={"full_page": True, "type": "png"})
     except Exception:
         return None
