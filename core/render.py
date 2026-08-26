@@ -30,12 +30,14 @@ ITEM_TMPL = """
   </div>
 </div>
 <style>
-  .wrap { width: 460px; padding: 10px; background: transparent;
+  html, body { margin: 0; padding: 0; }
+  .wrap { width: 100%; box-sizing: border-box; padding: 14px; background: #121218;
           font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
-  .card { background: #0c0c10ee; border: 1px solid #33333c; border-radius: 10px;
-          padding: 16px 18px 12px; }
-  .head { display: flex; align-items: center; gap: 14px; }
-  .icon { width: 64px; height: 64px; object-fit: contain; border-radius: 6px; background: #16161c; }
+  .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
+          border-radius: 14px; padding: 24px 28px 16px; }
+  .head { display: flex; align-items: center; gap: 18px; }
+  .icon { width: 92px; height: 92px; object-fit: contain; border-radius: 8px; background: #16161c; }
+  .name { font-size: 34px; font-weight: 700; }
   .name { font-size: 22px; font-weight: 700; }
   .name.unique { color: #af6025; }
   .name.normal { color: #d0d0d0; }
