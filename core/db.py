@@ -197,7 +197,8 @@ class SnapshotDB:
         if not q:
             return []
         en_map = {slug.lower(): cn for slug, (cn, _) in EQUIP_PAGES.items()}
-        q = en_map.get(q.replace(" ", "_").lower(), q)  # Ring/rings → 戒指
+        en = q.replace(" ", "_").lower()
+        q = en_map.get(en) or en_map.get(en + "s") or q  # Ring/rings/rings_ → 戒指
         with self._lock:
             row = self.conn.execute(
                 "SELECT DISTINCT item_class FROM mods WHERE item_class = ?", (q,)).fetchone()
