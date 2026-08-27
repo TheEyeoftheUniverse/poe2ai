@@ -231,3 +231,54 @@ async def render_find_card(plugin, effect, items, kind="unique") -> "str | None"
             options={"full_page": True, "type": "png"})
     except Exception:
         return None
+
+
+LIST_MODS_TMPL = """
+<div class="wrap">
+  <div class="card">
+    <div class="title">{{ item_class }} · 词缀一览</div>
+    <div class="sub">{{ '全部来源' if include_special else '常规词缀(前缀+后缀)' }} · 共 {{ rows|length }} 族</div>
+    <div class="cols">
+      {% for m in rows %}
+        <div class="row"><span class="tag {{ 'pre' if m.affix == '前缀' else 'suf' }}">{{ m.affix or '?' }}</span>
+          <span class="nm">{{ m.name_cn }}</span>
+          <span class="tx">{{ m.best_text }}</span>
+          <span class="lv">{{ m.max_level }}级</span></div>
+      {% endfor %}
+    </div>
+    <div class="foot">数据 poe2db.tw · 快照 {{ version }}</div>
+  </div>
+</div>
+<style>
+  html, body { margin: 0; padding: 0; background: #121218; }
+  .wrap { width: 100%; box-sizing: border-box; padding: 14px;
+          font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
+  .card { width: 100%; box-sizing: border-box; background: #0c0c10; border: 1px solid #33333c;
+          border-radius: 14px; padding: 24px 28px 16px; }
+  .title { font-size: 30px; font-weight: 700; color: #d0b86a; }
+  .sub { font-size: 18px; color: #7f7f7f; margin: 4px 0 14px; }
+  .cols { column-count: 2; column-gap: 18px; }
+  .row { break-inside: avoid; display: flex; align-items: baseline; gap: 6px;
+         padding: 3px 0; border-bottom: 1px dashed #22222a; }
+  .tag { font-size: 11px; padding: 0 4px; border-radius: 4px; flex-shrink: 0;
+         font-weight: 600; }
+  .tag.pre { color: #7db4ff; border: 1px solid #7db4ff66; }
+  .tag.suf { color: #ffb47d; border: 1px solid #ffb47d66; }
+  .nm { color: #c8c8c8; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .tx { color: #8888ff; font-size: 13px; flex: 1; }
+  .lv { color: #55555e; font-size: 11px; flex-shrink: 0; }
+  .foot { color: #55555e; font-size: 15px; margin-top: 12px; }
+</style>
+"""
+
+
+async def render_mods_list_card(plugin, item_class, rows, include_special=False) -> "str | None":
+    try:
+        return await plugin.html_render(
+            LIST_MODS_TMPL,
+            {"item_class": rows[0]["item_class"] if rows else item_class,
+             "rows": rows, "include_special": include_special,
+             "version": plugin.db.stats()["version"]},
+            options={"full_page": True, "type": "png"})
+    except Exception:
+        return None

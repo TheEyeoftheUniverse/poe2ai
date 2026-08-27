@@ -12,7 +12,8 @@ from astrbot.api.star import Context, Star, register
 
 from .core.db import SnapshotDB, format_item
 from .core.fetcher import Fetcher
-from .core.render import render_item_card, render_mods_card, render_wiki_card, render_find_card
+from .core.render import render_item_card, render_mods_card, render_wiki_card, render_find_card, \
+    render_mods_list_card
 
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 BUNDLED_DB = os.path.join(PLUGIN_DIR, "data", "poe2db.sqlite3")
@@ -110,6 +111,29 @@ class Poe2Ai(Star):
             lines.append("【" + it["name_cn"] + "】(" + (it["base_type"] or "") + ") " + ml)
         return "\n".join(lines)
 
+    @filter.llm_tool(name="poe2_list_mods")
+    async def list_mods(self, event: AstrMessageEvent, item_class: str, include_special: str = ""):
+        '''列出某部位/装备类型能带的全部词缀(词条),含前缀后缀、名称与数值区间。当用户问"XX能带什么词缀""列出XX的全部词条""XX有哪些词缀"时调用,一次返回完整列表。item_class 传部位名(如"戒指"、"项链"、"单手剑"、"腰带")。默认只列常规词缀;include_special 传"是"时包含精华等特殊来源。
+
+        Args:
+            item_class(string): 部位/装备类型名,如"戒指"
+            include_special(string): 可选,"是"=含特殊来源词缀,留空=仅常规
+        '''
+        rows = self.db.list_mods(item_class, include_special=(include_special == "是"))
+        if not rows:
+            return ("没有找到部位「" + item_class + "」的词缀数据。请确认部位名(如:戒指、项链、腰带、单手剑)。")
+        if self.config.get("render_image", True):
+            url = await render_mods_list_card(self, item_class, rows,
+                                              include_special=(include_special == "是"))
+            if url:
+                await self._deliver_image(event, url)
+        ic = rows[0]["item_class"]
+        lines = []
+        for m2 in rows:
+            lines.append("[" + (m2["affix"] or "?") + "] " + (m2["name_cn"] or "")
+                         + " " + (m2["best_text"] or "") + " (最高需求" + str(m2["max_level"]) + "级)")
+        return ic + " 词缀共 " + str(len(rows)) + " 族:\n" + "\n".join(lines)
+
     @filter.llm_tool(name="poe2_query_item")
     async def query_item(self, event: AstrMessageEvent, query: str):
         '''按名称查询 Path of Exile 2 的装备、物品或暗金(unique)装备,返回其属性、需求与固定效果,并附带装备图片。仅在已知装备名称时调用(如"猎首是什么效果""Headhunter 属性")。用户只描述效果而不知道名称时,应改用 poe2_find_items_by_effect。传入装备的标准中文名(如"猎首")或英文名(如"Headhunter"),不要传描述性语句。
@@ -149,7 +173,7 @@ class Poe2Ai(Star):
 
     @filter.llm_tool(name="poe2_query_mod")
     async def query_mod(self, event: AstrMessageEvent, query: str, item_class: str = ""):
-        '''查询 Path of Exile 2 的词条(词缀/mod)各阶级数值区间、出现部位与需求等级。当用户问词条/tier 数值时调用(如"t1攻速是多少""生命上限词条上限")。query 必须传官方效果关键词(2~8字,如"生命上限"、"攻击速度提高"),不传用户原话整句;口语自动归一(血量→生命上限、攻速→攻击速度)。想按效果找具体装备时改用 poe2_find_items_by_effect。
+        '''查询 Path of Exile 2 的词条(词缀/mod)各阶级数值区间、出现部位与需求等级。当用户问词条/tier 数值时调用(如"t1攻速是多少""生命上限词条上限")。query 必须传官方效果关键词(2~8字,如"生命上限"、"攻击速度提高"),不传用户原话整句;口语自动归一(血量→生命上限、攻速→攻击速度)。想按效果找具体装备时改用 poe2_find_items_by_effect;要列出某部位的全部词缀时改用 poe2_list_mods(此时本工具不适用)。
 
         Args:
             query(string): 官方效果关键词,如"攻击速度提高"

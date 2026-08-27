@@ -96,6 +96,14 @@ class TestDB(unittest.TestCase):
         items2 = self.db.find_items_by_effect("血量", kind="unique", limit=6)
         self.assertTrue(items2)
 
+    def test_06a_list_mods(self):
+        rows = self.db.list_mods("戒指")
+        self.assertGreater(len(rows), 100)
+        self.assertTrue(all(r["best_text"] for r in rows))
+        self.assertTrue(any(r["affix"] == "前缀" for r in rows))
+        self.assertTrue(any(r["affix"] == "后缀" for r in rows))
+        self.assertEqual(self.db.list_mods("不存在的部位xyz"), [])
+
     def test_06b_search_reforge(self):
         rfs = self.db.search_reforge("布琳翰德印记")
         self.assertTrue(rfs)

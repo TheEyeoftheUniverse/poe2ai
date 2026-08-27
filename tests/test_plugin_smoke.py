@@ -81,6 +81,7 @@ class TestPluginSmoke(unittest.TestCase):
 
     def test_01_registered(self):
         self.assertIn("poe2_find_items_by_effect", self.llm_tools)
+        self.assertIn("poe2_list_mods", self.llm_tools)
         self.assertIn("poe2_query_item", self.llm_tools)
         self.assertIn("poe2_query_mod", self.llm_tools)
         self.assertIn("poe2_search_wiki", self.llm_tools)
@@ -103,6 +104,13 @@ class TestPluginSmoke(unittest.TestCase):
             self.assertEqual([k for k, _ in ev.sent], ["image"])  # 收尾发出最终卡
         finally:
             self.mod.render_find_card = orig
+
+    def test_01c_list_mods(self):
+        ev = FakeEvent()
+        ret = self._call_tool(self.plugin.list_mods, ev, item_class="戒指")
+        self.assertIn("戒指", ret)
+        self.assertIn("前缀", ret)
+        self.assertGreater(ret.count("\n"), 100)
 
     def test_02_query_item_with_image(self):
         """单品卡延迟发:数据 return 给 LLM,图入队,agent 收尾才发"""

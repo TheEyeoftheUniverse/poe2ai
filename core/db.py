@@ -6,6 +6,8 @@ import shutil
 import sqlite3
 import threading
 
+from .parse import EQUIP_PAGES
+
 
 # 常见口语 → 官方术语(查询前展开,提升模糊命中率)
 SYNONYMS = {
@@ -188,6 +190,36 @@ class SnapshotDB:
         with self._lock:
             rows = self.conn.execute(sql, args).fetchall()
             return [dict(r) for r in rows]
+
+    def list_mods(self, item_class: str, include_special: bool = False, limit: int = 250):
+        """列出某部位能带的全部词缀族(同名多 tier 聚合为一行)。"""
+        q = item_class.strip()
+        if not q:
+            return []
+        en_map = {slug.lower(): cn for slug, (cn, _) in EQUIP_PAGES.items()}
+        q = en_map.get(q.replace(" ", "_").lower(), q)  # Ring/rings → 戒指
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT DISTINCT item_class FROM mods WHERE item_class = ?", (q,)).fetchone()
+            if not row:  # 宽松匹配
+                row = self.conn.execute(
+                    "SELECT DISTINCT item_class FROM mods WHERE item_class LIKE ? LIMIT 1",
+                    (f"%{q}%",)).fetchone()
+            if not row:
+                return []
+            ic = row["item_class"]
+            grps = "" if include_special else " AND grp = 'normal'"
+            rows = self.conn.execute(
+                "SELECT name_cn, affix, MAX(CAST(level AS INTEGER)) AS max_level,"
+                " (SELECT text FROM mods m2 WHERE m2.name_cn = m1.name_cn"
+                "   AND m2.item_class = m1.item_class" + (" AND grp = 'normal'" if not include_special else "") +
+                "   ORDER BY CAST(m2.level AS INTEGER) DESC, LENGTH(m2.text) DESC LIMIT 1) AS best_text"
+                " FROM mods m1 WHERE item_class = ?" + grps +
+                " GROUP BY name_cn ORDER BY affix DESC, name_cn LIMIT ?", (ic, limit)).fetchall()
+            out = [dict(r) for r in rows]
+            for o in out:
+                o["item_class"] = ic
+            return out
 
     def find_items_by_effect(self, effect: str, kind: str = "unique", limit: int = 20):
         """按效果关键词反查装备(默认暗金),返回含匹配行。"""
