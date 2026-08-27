@@ -107,7 +107,7 @@ class Fetcher:
                     if not isinstance(e, dict):
                         continue
                     rows.append((
-                        grp, e.get("Name", ""), "", cn,
+                        grp, html_to_text(e.get("Name", "")), "", cn,
                         AFFIX_GEN.get(str(e.get("ModGenerationTypeID", "")), ""),
                         str(e.get("Level", "")), str(e.get("DropChance", "")),
                         html_to_text(e.get("str", "")), "/cn/" + slug))

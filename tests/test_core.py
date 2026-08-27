@@ -79,6 +79,13 @@ class TestDB(unittest.TestCase):
         mods = self.db.search_mod("攻击速度提高", item_class="单手剑")
         self.assertGreaterEqual(len(mods), 4)  # 多 tier
         self.assertTrue(all("攻击速度" in m["text"] for m in mods))
+        # tier 标注:T1=数值最强档(需求等级最高),常规组无特殊来源混入
+        self.assertTrue(all(m.get("tier") for m in mods))
+        self.assertIn("T1", [m["tier"] for m in mods])
+        t1 = [m for m in mods if m["tier"] == "T1"][0]
+        self.assertEqual(int(t1["level"]), max(int(m["level"]) for m in mods))
+        self.assertEqual("<", "", ) if False else None
+        self.assertNotIn("<a", t1["text"] + t1["name_cn"])  # 无 HTML 残留
 
     def test_05_search_mod_no_class(self):
         mods = self.db.search_mod("生命上限")

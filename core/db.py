@@ -44,6 +44,24 @@ STOPWORDS = [
 ]
 
 
+def _mod_family_key(text: str) -> str:
+    """效果文本 → 族键(去数字/符号,同族不同档归一)。"""
+    return re.sub(r"[0-9.\s\u2014\-()+%]", "", text or "")
+
+
+def _annotate_tiers(rows: list) -> list:
+    """同族词条按需求等级降序标注 T1/T2/...(T1=数值最强档,社区口径)。"""
+    fams = {}
+    for r in rows:
+        fams.setdefault((_mod_family_key(r["text"]), r["affix"], r["item_class"], r["grp"]), []).append(r)
+    for fam_rows in fams.values():
+        fam_rows.sort(key=lambda x: int(x["level"] or 0), reverse=True)
+        for i, r in enumerate(fam_rows, 1):
+            r["tier"] = "T" + str(i)
+    rows.sort(key=lambda r: int(r["level"] or 0), reverse=True)  # 高档在前
+    return rows
+
+
 class SnapshotDB:
     """读写运行库。首次运行/快照升级时从插件自带快照复制一份到运行目录。"""
 
@@ -181,7 +199,7 @@ class SnapshotDB:
         terms = self._refine_terms(q)
         cond = " OR ".join(["text LIKE ?"] * len(terms) + ["name_cn LIKE ?"] * len(terms))
         args = [f"%{t}%" for t in terms] * 2
-        sql = f"SELECT * FROM mods WHERE ({cond})"
+        sql = f"SELECT * FROM mods WHERE ({cond}) AND grp = 'normal'"
         if item_class:
             sql += " AND item_class = ?"
             args.append(item_class)
@@ -189,7 +207,7 @@ class SnapshotDB:
         args.append(limit)
         with self._lock:
             rows = self.conn.execute(sql, args).fetchall()
-            return [dict(r) for r in rows]
+            return _annotate_tiers([dict(r) for r in rows])
 
     def list_mods(self, item_class: str, include_special: bool = False, limit: int = 250):
         """列出某部位能带的全部词缀族(同名多 tier 聚合为一行)。"""

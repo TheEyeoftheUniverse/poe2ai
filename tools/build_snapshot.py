@@ -86,7 +86,7 @@ def build(cache_dir, db_path):
                         c.execute(
                             "INSERT INTO mods(grp,name_cn,name_en,item_class,affix,level,drop_chance,text,page_slug)"
                             " VALUES(?,?,?,?,?,?,?,?,?)",
-                            (grp, e.get("Name", ""), "",
+                            (grp, html_to_text(e.get("Name", "")), "",
                              cn, AFFIX_GEN.get(str(e.get("ModGenerationTypeID", "")), ""),
                              str(e.get("Level", "")), str(e.get("DropChance", "")),
                              html_to_text(e.get("str", "")), slug))

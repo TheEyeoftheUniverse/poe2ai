@@ -173,7 +173,7 @@ class Poe2Ai(Star):
 
     @filter.llm_tool(name="poe2_query_mod")
     async def query_mod(self, event: AstrMessageEvent, query: str, item_class: str = ""):
-        '''查询 Path of Exile 2 的词条(词缀/mod)各阶级数值区间、出现部位与需求等级。当用户问词条/tier 数值时调用(如"t1攻速是多少""生命上限词条上限")。query 必须传官方效果关键词(2~8字,如"生命上限"、"攻击速度提高"),不传用户原话整句;口语自动归一(血量→生命上限、攻速→攻击速度)。想按效果找具体装备时改用 poe2_find_items_by_effect;要列出某部位的全部词缀时改用 poe2_list_mods(此时本工具不适用)。
+        '''查询 Path of Exile 2 的词条(词缀/mod)各阶级数值区间、出现部位与需求等级。当用户问词条/tier 数值时调用(如"t1攻速是多少""生命上限词条上限")。query 必须传官方效果关键词(2~8字,如"生命上限"、"攻击速度提高"),不传用户原话整句;结果已按档位标注 T1/T2/...(T1=数值最强、需求等级最高的最高档),用户问"t1 XX"时直接取标注 T1 的行;口语自动归一(血量→生命上限、攻速→攻击速度)。想按效果找具体装备时改用 poe2_find_items_by_effect;要列出某部位的全部词缀时改用 poe2_list_mods(此时本工具不适用)。
 
         Args:
             query(string): 官方效果关键词,如"攻击速度提高"
@@ -195,9 +195,8 @@ class Poe2Ai(Star):
         for name, group in list(by_name.items())[:5]:
             parts = []
             for m in group[:8]:
-                seg = m["text"]
-                extra = [x for x in (m["item_class"], m["affix"], "需求" + m["level"] + "级") if x]
-                parts.append(seg + " (" + ", ".join(extra) + ")" if extra else seg)
+                seg = "[" + (m.get("tier") or "?") + "·" + (m["affix"] or "?") + "] " + m["text"]
+                parts.append(seg + " (需求" + m["level"] + "级)")
             lines.append("【" + name + "】\n" + "\n".join(parts))
         return "\n\n".join(lines)
 
